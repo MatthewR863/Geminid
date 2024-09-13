@@ -1,0 +1,84 @@
+import csv
+import json
+import requests
+import os
+
+TOKEN_URL =
+SALESFORCE_URL = 'https://dream-business-97302.scratch.lightning.force.com/lightning/o/Account/list?filterName=00BDM000005liiN2AQ'
+
+SALESFORCE_CREDENTIALS = {
+    'username': os.getenv('SALESFORCE_USERNAME', 'test-v4om1e306znv@example.com'),
+    'password': os.getenv('SALESFORCE_PASSWORD', '9$kwafpuFnvrv')
+}
+
+def get_salesforce_access_token():
+    response = requests.post(TOKEN_URL, data=SALESFORCE_CREDENTIALS)
+    if response.status_code == 200:
+        data = response.json()
+        return data.get('access_token'), data.get('instance_url')
+    else:
+        print(f"Failed to get access token: {response.status_code}")
+        print(response.text)
+        return None, None
+
+def csv_to_json(csv_file, json_file):
+    try:
+        data = []
+        with open(csv_file, encoding='utf-8') as f:
+            csv_reader = csv.DictReader(f)
+            for row in csv_reader:
+                data.append(row)
+
+        with open(json_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4)
+    except FileNotFoundError:
+        print(f"File not found: {csv_file}")
+    except Exception as e:
+        print(f"Error occurred: {e}")
+
+def upsert_records(json_file, access_token, instance_url):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    with open(json_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    records = [{
+        "attributes": {"type": "Account"},
+        "Name": record.get("Name"),
+        "External_Id__c": record.get("External_Id__c")
+    } for record in data]
+
+    body = {
+        "allOrNone": False,
+        "records": records
+    }
+
+    response = requests.post(TOKEN_URL, headers=headers, json=body)
+
+    if response.status_code == 200:
+        result = response.json()
+        for record in result:
+            if record['success']:
+                print(f"Record with ID {record['id']} upserted successfully.")
+            else:
+                print(f"Failed to upsert record: {record['errors']}")
+    else:
+        print(f"Failed to upsert records: {response.status_code}")
+        print(response.text)
+
+def main():
+    access_token, instance_url = get_salesforce_access_token()
+    if access_token:
+        print(f"Access Token: {access_token}")
+        print(f"Instance URL: {instance_url}")
+
+        csv_to_json('testintern.csv', 'output.json')
+        upsert_records('output.json', access_token, instance_url)
+    else:
+        print("Unable to proceed due to authentication failure.")
+
+if __name__ == "__main__":
+    main()
