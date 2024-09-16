@@ -78,7 +78,7 @@ def main():
         csv_to_json('testintern.csv', 'output.json')
         upsert_records('output.json', access_token, instance_url)
     else:
-        print("Unable to proceed due to authentication failure.")
+        print("Authentication failure.")
 
 if __name__ == "__main__":
     main()
